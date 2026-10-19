@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The System</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050914;--panel:#0b1530;--line:#2a6bff;--glow:#4aa3ff;--text:#dbe9ff;--dim:#7d93bd;--warn:#ff4d6d;--ok:#5ef2c0;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 50% -10%,#10265a 0,var(--bg) 60%) fixed;color:var(--text);font-family:'Rajdhani','Segoe UI',system-ui,sans-serif;font-size:17px;min-height:100vh}
+main{max-width:480px;margin:0 auto;padding:16px}
+.win{background:linear-gradient(180deg,rgba(18,40,90,.55),rgba(8,16,40,.85));border:1px solid var(--line);box-shadow:0 0 18px rgba(42,107,255,.35),inset 0 0 18px rgba(42,107,255,.12);padding:14px 16px;margin-bottom:16px;position:relative}
+.win h2{margin:-26px 0 10px;display:inline-block;background:var(--bg);border:1px solid var(--line);padding:2px 12px;font-size:15px;letter-spacing:.14em;font-weight:700;color:var(--glow)}
+.top{display:flex;justify-content:space-between;align-items:baseline}
+.title{font-size:26px;font-weight:700;letter-spacing:.06em;text-shadow:0 0 10px var(--glow)}
+.rank{font-size:44px;font-weight:700;color:var(--glow);text-shadow:0 0 14px var(--glow);line-height:1}
+.lvl{color:var(--dim)}
+.bar{height:10px;background:#0a1228;border:1px solid #1d3a80;margin:8px 0 2px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,#2a6bff,#7fd0ff);box-shadow:0 0 10px var(--glow);transition:width .5s}
+.sub{display:flex;justify-content:space-between;color:var(--dim);font-size:14px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-top:10px}
+.stat{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #16306e;padding:4px 0}
+.stat b{font-size:20px}
+.stat button{margin-left:8px;width:28px;height:28px;background:transparent;border:1px solid var(--ok);color:var(--ok);font:inherit;font-size:18px;cursor:pointer}
+.stat button:disabled{display:none}
+.pts{margin-top:8px;color:var(--ok)}
+.quest{padding:10px 0;border-bottom:1px solid #16306e}
+.quest:last-child{border:0}
+.qrow{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.qname{font-weight:600}
+.qnum{color:var(--dim)}
+.done .qname{color:var(--ok)}
+.add{background:transparent;border:1px solid var(--line);color:var(--text);font:inherit;padding:6px 12px;cursor:pointer;min-width:64px}
+.add:active{background:var(--line)}
+.done .add{border-color:var(--ok);color:var(--ok)}
+.warn{color:var(--warn);font-size:15px;margin:0 0 8px}
+.reset{background:none;border:0;color:var(--dim);font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;display:block;margin:0 auto 24px}
+#modal{position:fixed;inset:0;background:rgba(2,6,16,.88);display:none;align-items:center;justify-content:center;padding:24px;z-index:9}
+#modal.on{display:flex}
+#modal .win{width:100%;max-width:360px;text-align:center;animation:pop .35s ease-out}
+#modal h3{margin:0 0 6px;font-size:28px;letter-spacing:.08em;text-shadow:0 0 12px var(--glow)}
+#modal p{margin:6px 0 14px;color:var(--dim)}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){#modal .win{animation:none}.bar i{transition:none}}
+button:focus-visible{outline:2px solid var(--ok);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+  <div class="win" style="margin-top:22px">
+    <h2>STATUS</h2>
+    <div class="top">
+      <div><div class="title" id="name">Player</div><div class="lvl" id="job">Job: None · Title: Weakest Hunter</div></div>
+      <div style="text-align:right"><div class="rank" id="rank">E</div><div class="lvl" id="lvl">Lv. 1</div></div>
+    </div>
+    <div class="bar"><i id="xpbar" style="width:0"></i></div>
+    <div class="sub"><span id="xptxt">0 / 100 XP</span><span id="streak">Streak: 0 days</span></div>
+    <div class="stats" id="stats"></div>
+    <div class="pts" id="pts"></div>
+  </div>
+
+  <div class="win">
+    <h2>DAILY QUEST: PREPARE TO BECOME STRONG</h2>
+    <p class="warn" id="warn">Warning: failing to complete the daily quest will result in a penalty.</p>
+    <div id="quests"></div>
+  </div>
+
+  <button class="reset" id="rename">Change hunter name</button>
+  <button class="reset" id="wipe">Reset all progress</button>
+</main>
+
+<div id="modal"><div class="win"><h3 id="mt"></h3><p id="mp"></p><button class="add" id="mok">Accept</button></div></div>
+
+<script>
+(function(){
+var KEY='system_v1';
+var QUESTS=[
+  {id:'push',name:'Push-ups',target:100,step:10,stat:'str'},
+  {id:'sit',name:'Sit-ups',target:100,step:10,stat:'vit'},
+  {id:'squat',name:'Squats',target:100,step:10,stat:'agi'},
+  {id:'run',name:'Run (km)',target:10,step:1,stat:'sen'},
+  {id:'read',name:'Study (minutes)',target:30,step:10,stat:'int'}
+];
+var STATS=[['str','Strength'],['agi','Agility'],['vit','Vitality'],['int','Intelligence'],['sen','Sense']];
+var S;
+function today(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+function fresh(){return{name:'',level:1,xp:0,points:0,stats:{str:10,agi:10,vit:10,int:10,sen:10},day:today(),prog:{},bonus:false,streak:0,lastFull:''}}
+function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r)}catch(e){}return fresh()}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function need(l){return 100+(l-1)*50}
+function rank(l){return l<10?'E':l<20?'D':l<30?'C':l<40?'B':l<50?'A':'S'}
+function title(l){return l<5?'Weakest Hunter':l<10?'Wolf Slayer':l<20?'Rising Hunter':l<30?'Gate Clearer':l<50?'Elite Hunter':'Shadow Monarch'}
+var queue=[];
+function popup(t,p){queue.push([t,p]);if(!document.getElementById('modal').classList.contains('on'))next()}
+function next(){var m=document.getElementById('modal');var q=queue.shift();if(!q){m.classList.remove('on');return}
+  document.getElementById('mt').textContent=q[0];document.getElementById('mp').textContent=q[1];m.classList.add('on');document.getElementById('mok').focus()}
+document.getElementById('mok').onclick=next;
+
+function rollDay(){
+  if(S.day===today())return;
+  var full=QUESTS.every(function(q){return (S.prog[q.id]||0)>=q.target});
+  var y=new Date();y.setDate(y.getDate()-1);
+  var ykey=y.getFullYear()+'-'+(y.getMonth()+1)+'-'+y.getDate();
+  if(!full){
+    var loss=Math.min(S.xp,40);S.xp-=loss;S.streak=0;
+    popup('Penalty','You did not clear yesterday’s quest. You lost '+loss+' XP.');
+  } else if(S.lastFull!==ykey){S.streak=0}
+  S.day=today();S.prog={};S.bonus=false;save();
+}
+function gain(n){
+  S.xp+=n;
+  while(S.xp>=need(S.level)){
+    S.xp-=need(S.level);S.level++;S.points+=3;
+    popup('Level up','You are now level '+S.level+'. 3 stat points available.');
+  }
+}
+function add(q){
+  var cur=S.prog[q.id]||0;if(cur>=q.target)return;
+  S.prog[q.id]=Math.min(q.target,cur+q.step);
+  if(S.prog[q.id]>=q.target){
+    gain(40);
+    popup('Quest cleared',q.name+' complete. +40 XP.');
+    if(QUESTS.every(function(x){return (S.prog[x.id]||0)>=x.target})&&!S.bonus){
+      S.bonus=true;S.streak++;S.lastFull=today();gain(60);
+      popup('Daily quest complete','All tasks cleared. +60 XP bonus. Streak: '+S.streak+' days.');
+    }
+  }
+  save();render();
+}
+function render(){
+  document.getElementById('name').textContent=S.name||'Player';
+  document.getElementById('job').textContent='Job: None · Title: '+title(S.level);
+  document.getElementById('rank').textContent=rank(S.level);
+  document.getElementById('lvl').textContent='Lv. '+S.level;
+  var n=need(S.level);
+  document.getElementById('xpbar').style.width=(S.xp/n*100)+'%';
+  document.getElementById('xptxt').textContent=S.xp+' / '+n+' XP';
+  document.getElementById('streak').textContent='Streak: '+S.streak+' days';
+  var st=document.getElementById('stats');st.innerHTML='';
+  STATS.forEach(function(s){
+    var d=document.createElement('div');d.className='stat';
+    var l=document.createElement('span');l.textContent=s[1];
+    var r=document.createElement('span');var b=document.createElement('b');b.textContent=S.stats[s[0]];r.appendChild(b);
+    var btn=document.createElement('button');btn.textContent='+';btn.setAttribute('aria-label','Add point to '+s[1]);btn.disabled=S.points<1;
+    btn.onclick=function(){S.points--;S.stats[s[0]]++;save();render()};
+    r.appendChild(btn);d.appendChild(l);d.appendChild(r);st.appendChild(d);
+  });
+  document.getElementById('pts').textContent=S.points>0?'Available points: '+S.points:'';
+  var qs=document.getElementById('quests');qs.innerHTML='';
+  QUESTS.forEach(function(q){
+    var v=S.prog[q.id]||0,done=v>=q.target;
+    var d=document.createElement('div');d.className='quest'+(done?' done':'');
+    var row=document.createElement('div');row.className='qrow';
+    var left=document.createElement('div');
+    var nm=document.createElement('div');nm.className='qname';nm.textContent=q.name;
+    var nu=document.createElement('div');nu.className='qnum';nu.textContent=v+' / '+q.target+'  ·  boosts '+q.stat;
+    left.appendChild(nm);left.appendChild(nu);
+    var b=document.createElement('button');b.className='add';b.textContent=done?'Done':'+'+q.step;b.disabled=done;
+    b.onclick=function(){add(q)};
+    row.appendChild(left);row.appendChild(b);d.appendChild(row);
+    var bar=document.createElement('div');bar.className='bar';var i=document.createElement('i');i.style.width=(v/q.target*100)+'%';bar.appendChild(i);d.appendChild(bar);
+    qs.appendChild(d);
+  });
+}
+document.getElementById('rename').onclick=function(){var n=prompt('Hunter name?',S.name||'');if(n!==null){S.name=n.trim().slice(0,20);save();render()}};
+document.getElementById('wipe').onclick=function(){if(confirm('Erase all progress?')){S=fresh();save();render()}};
+
+S=load();
+// stat bonus on quest completion is flavour: quests list which stat they build
+rollDay();
+if(!S.name){var n=prompt('The System has chosen you. Enter your hunter name:','');S.name=(n||'Player').trim().slice(0,20)||'Player';save()}
+render();
+})();
+</script>
+</body>
+</html>
